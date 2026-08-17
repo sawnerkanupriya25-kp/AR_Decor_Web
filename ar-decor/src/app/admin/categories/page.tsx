@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 
 interface Category {
@@ -22,7 +22,7 @@ interface Section {
   slug: string;
 }
 
-export default function AdminCategories() {
+function CategoriesContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -338,5 +338,17 @@ export default function AdminCategories() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminCategories() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+      </div>
+    }>
+      <CategoriesContent />
+    </Suspense>
   );
 }
