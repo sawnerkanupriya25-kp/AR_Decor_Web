@@ -6,17 +6,17 @@ export async function createInitialAdmin() {
   try {
     await dbConnect();
     
-    const existingAdmin = await Admin.findOne({ email: 'admin@ardecor.com' });
+    const existingAdmin = await Admin.findOne({ email: 'ardecor@admin' });
     if (existingAdmin) {
       console.log('Admin already exists');
       return;
     }
 
-    const passwordHash = await bcrypt.hash('admin123', 10);
+    const passwordHash = await bcrypt.hash('Aman@Kanu', 10);
     
     await Admin.create({
       name: 'AR Decor Admin',
-      email: 'admin@ardecor.com',
+      email: 'ardecor@admin',
       passwordHash,
       role: 'admin',
     });
