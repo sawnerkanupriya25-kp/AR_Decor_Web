@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('ardecor@admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
       });
 
       if (result?.error) {
-        setError('Invalid email or password');
+        setError('Invalid email or password. Please contact support.');
       } else {
         router.push('/admin/dashboard');
       }
