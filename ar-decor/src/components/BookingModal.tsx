@@ -16,6 +16,7 @@ interface BookingModalProps {
     mediaType: string;
   };
   category?: {
+    _id?: string;
     name: string;
   };
 }
