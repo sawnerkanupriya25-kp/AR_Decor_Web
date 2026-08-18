@@ -1,354 +1,154 @@
 'use client';
-
-import { useSession } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Category {
   _id: string;
   name: string;
-  slug: string;
+  section: string;
   description: string;
-  sectionId: string;
-  coverImage?: string;
-  sortOrder: number;
+  slug: string;
   active: boolean;
 }
 
-interface Section {
-  _id: string;
-  name: string;
-  slug: string;
-}
-
-function CategoriesContent() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    description: '',
-    sectionId: '',
-    coverImage: '',
-    sortOrder: 0,
-    active: true,
-  });
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({ name: '', section: 'Balloon Decor', description: '', slug: '' });
+  const router = useRouter();
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/admin');
-      return;
-    }
+    fetchCategories();
+  }, []);
 
-    if (status === 'authenticated') {
-      fetchData();
-    }
-  }, [status]);
-
-  useEffect(() => {
-    if (searchParams.get('action') === 'add') {
-      openAddModal();
-    }
-  }, [searchParams]);
-
-  const fetchData = async () => {
+  const fetchCategories = async () => {
     try {
-      const [categoriesRes, sectionsRes] = await Promise.all([
-        fetch('/api/admin/categories'),
-        fetch('/api/admin/sections'),
-      ]);
-
-      const categoriesData = await categoriesRes.json();
-      const sectionsData = await sectionsRes.json();
-
-      setCategories(categoriesData);
-      setSections(sectionsData);
+      const res = await fetch('/api/admin/categories');
+      const data = await res.json();
+      setCategories(data);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Failed to fetch categories', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const openAddModal = () => {
-    setEditingCategory(null);
-    setFormData({
-      name: '',
-      slug: '',
-      description: '',
-      sectionId: sections[0]?._id || '',
-      coverImage: '',
-      sortOrder: categories.length,
-      active: true,
-    });
-    setShowModal(true);
-  };
-
-  const openEditModal = (category: Category) => {
-    setEditingCategory(category);
-    setFormData({
-      name: category.name,
-      slug: category.slug,
-      description: category.description,
-      sectionId: category.sectionId,
-      coverImage: category.coverImage || '',
-      sortOrder: category.sortOrder,
-      active: category.active,
-    });
-    setShowModal(true);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const url = editingCategory
-      ? `/api/admin/categories?id=${editingCategory._id}`
-      : '/api/admin/categories';
-    
-    const method = editingCategory ? 'PUT' : 'POST';
+    const url = editingId ? `/api/admin/categories/${editingId}` : '/api/admin/categories';
+    const method = editingId ? 'PUT' : 'POST';
 
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+    await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
 
-      if (res.ok) {
-        setShowModal(false);
-        fetchData();
-      } else {
-        alert('Error saving category');
-      }
-    } catch (error) {
-      console.error('Error saving category:', error);
-      alert('Error saving category');
-    }
+    setShowForm(false);
+    setEditingId(null);
+    setFormData({ name: '', section: 'Balloon Decor', description: '', slug: '' });
+    fetchCategories();
+    alert('Category saved successfully!');
+  };
+
+  const handleEdit = (cat: Category) => {
+    setFormData({ name: cat.name, section: cat.section, description: cat.description, slug: cat.slug || '' });
+    setEditingId(cat._id);
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
-
-    try {
-      const res = await fetch(`/api/admin/categories?id=${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        fetchData();
-      } else {
-        alert('Error deleting category');
-      }
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      alert('Error deleting category');
-    }
+    await fetch(`/api/admin/categories/${id}`, { method: 'DELETE' });
+    fetchCategories();
   };
 
-  if (status === 'loading' || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="p-8 text-center">Loading categories...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-serif font-bold text-gray-900">Manage Categories</h1>
-            <button
-              onClick={openAddModal}
-              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Categories Management</h1>
+        <button 
+          onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', section: 'Balloon Decor', description: '', slug: '' }); }} 
+          className="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 shadow-md transition"
+        >
+          {showForm ? 'Cancel' : '+ Add New Category'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-white p-6 rounded-lg shadow-lg mb-8 border-l-4 border-yellow-500">
+          <h3 className="text-xl font-bold mb-4 text-gray-700">{editingId ? 'Edit Category' : 'Add New Category'}</h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input 
+              className="w-full border p-3 rounded focus:ring-2 focus:ring-yellow-500 outline-none" 
+              placeholder="Category Name (e.g., Birthday Decor)" 
+              value={formData.name}
+              onChange={e => setFormData({...formData, name: e.target.value})}
+              required
+            />
+            <input 
+              className="w-full border p-3 rounded focus:ring-2 focus:ring-yellow-500 outline-none" 
+              placeholder="Slug (e.g., birthday-decor)" 
+              value={formData.slug}
+              onChange={e => setFormData({...formData, slug: e.target.value})}
+            />
+            <select 
+              className="w-full border p-3 rounded focus:ring-2 focus:ring-yellow-500 outline-none"
+              value={formData.section}
+              onChange={e => setFormData({...formData, section: e.target.value})}
             >
-              Add Category
+              <option>Balloon Decor</option>
+              <option>Wedding Entries</option>
+            </select>
+            <textarea 
+              className="w-full border p-3 rounded focus:ring-2 focus:ring-yellow-500 outline-none" 
+              placeholder="Description" 
+              rows={3}
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+            />
+            <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 w-full font-bold">
+              {editingId ? 'Update Category' : 'Create Category'}
             </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 py-4 overflow-x-auto">
-            <Link href="/admin/dashboard" className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-amber-600 whitespace-nowrap">
-              Dashboard
-            </Link>
-            <Link href="/admin/categories" className="px-3 py-2 text-sm font-medium text-amber-600 border-b-2 border-amber-600 whitespace-nowrap">
-              Categories
-            </Link>
-            <Link href="/admin/designs" className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-amber-600 whitespace-nowrap">
-              Designs
-            </Link>
-            <Link href="/admin/enquiries" className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-amber-600 whitespace-nowrap">
-              Enquiries
-            </Link>
-            <Link href="/admin/settings" className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-amber-600 whitespace-nowrap">
-              Settings
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {categories.map((category) => (
-                <tr key={category._id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {category.coverImage && (
-                        <img src={category.coverImage} alt={category.name} className="h-10 w-10 rounded-lg object-cover mr-3" />
-                      )}
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{category.name}</div>
-                        <div className="text-sm text-gray-500">{category.slug}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {sections.find(s => s._id === category.sectionId)?.name || 'Unknown'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${category.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {category.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button onClick={() => openEditModal(category)} className="text-amber-600 hover:text-amber-900 mr-4">Edit</button>
-                    <button onClick={() => handleDelete(category._id)} className="text-red-600 hover:text-red-900">Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </main>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold mb-4">
-              {editingCategory ? 'Edit Category' : 'Add Category'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
-                <input
-                  type="text"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  rows={3}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                <select
-                  value={formData.sectionId}
-                  onChange={(e) => setFormData({ ...formData, sectionId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  required
-                >
-                  {sections.map((section) => (
-                    <option key={section._id} value={section._id}>
-                      {section.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL</label>
-                <input
-                  type="url"
-                  value={formData.coverImage}
-                  onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  placeholder="https://example.com/image.jpg"
-                />
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="active"
-                  checked={formData.active}
-                  onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                  className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
-                />
-                <label htmlFor="active" className="ml-2 block text-sm text-gray-700">Active</label>
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
-                >
-                  {editingCategory ? 'Update' : 'Create'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
       )}
-    </div>
-  );
-}
 
-export default function AdminCategories() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-100 text-gray-600 uppercase text-sm">
+            <tr>
+              <th className="p-4">Name</th>
+              <th className="p-4">Section</th>
+              <th className="p-4">Slug</th>
+              <th className="p-4">Status</th>
+              <th className="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.length === 0 ? (
+              <tr><td colSpan="5" className="p-8 text-center text-gray-500">No categories found. Click "Add New Category" to start.</td></tr>
+            ) : (
+              categories.map((cat) => (
+                <tr key={cat._id} className="border-t hover:bg-gray-50">
+                  <td className="p-4 font-medium text-gray-800">{cat.name}</td>
+                  <td className="p-4 text-gray-600">{cat.section}</td>
+                  <td className="p-4 text-gray-500 text-sm">{cat.slug || '-'}</td>
+                  <td className="p-4"><span className={`px-2 py-1 rounded text-xs ${cat.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{cat.active ? 'Active' : 'Inactive'}</span></td>
+                  <td className="p-4 text-right space-x-2">
+                    <button onClick={() => handleEdit(cat)} className="text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+                    <button onClick={() => handleDelete(cat._id)} className="text-red-600 hover:text-red-800 font-medium">Delete</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
-    }>
-      <CategoriesContent />
-    </Suspense>
+    </div>
   );
 }
